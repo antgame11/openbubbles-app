@@ -1,28 +1,45 @@
-on: [ push, pull_request ]
-name: Build
+on: [push, pull_request]
+
+name: Build Linux (Release)
+
 jobs:
   build:
-    name: OpenBubbles APK
+    name: OpenBubbles Linux Release
     runs-on: ubuntu-latest
+
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: true
-          android: true
           dotnet: true
           haskell: true
           large-packages: true
           swap-storage: true
 
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            liblzma-dev \
+            libstdc++-12-dev \
+            protobuf-compiler
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          profile: minimal
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -30,17 +47,8 @@ jobs:
           channel: stable
           flutter-version: 3.24.0
 
-      - name: Set up Java
-        uses: actions/setup-java@v2
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-      
-      - name: Setup Android SDK
-        uses: amyu/setup-android@v5
-
-      - name: Install Protobuf compiler
-        run: sudo apt-get install -y protobuf-compiler
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
 
       - name: Set up fake Fairplay keys
         run: |
@@ -60,16 +68,16 @@ jobs:
           )
 
           for name in "${cert_names[@]}"; do
-              cp rustpush/certs/legacy-fairplay/fairplay.pem rustpush/certs/fairplay/$name.pem
-              cp rustpush/certs/legacy-fairplay/fairplay.crt rustpush/certs/fairplay/$name.crt
+            cp rustpush/certs/legacy-fairplay/fairplay.pem rustpush/certs/fairplay/$name.pem
+            cp rustpush/certs/legacy-fairplay/fairplay.crt rustpush/certs/fairplay/$name.crt
           done
 
-      # First run is expected to fail until ffmpeg_kit_flutter_new is fixed.
-      - name: Run Build Script
+      - name: Build Linux app (release)
         run: |
-          flutter build apk --flavor alpha --debug --target-platform android-arm64
-      
-      - uses: actions/upload-artifact@v4
+          flutter build linux --release
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: Alpha Debug APK
-          path: build/app/outputs/flutter-apk/app-alpha-debug.apk
+          name: OpenBubbles-Linux-x64-Release
+          path: build/linux/x64/release/bundle
